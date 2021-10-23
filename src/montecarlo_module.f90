@@ -2771,7 +2771,7 @@ subroutine do_monte_carlo_bjorkmanwood(params,ierror,resetseed)
    !
    if(amrray_nr_out_cell_events.gt.0) then
       write(stdo,*) 'Warning: There were ',amrray_nr_out_cell_events,' out-of-cell events.'
-      write(stdo,*) '         That is one such event every ',nphot/amrray_nr_out_cell_events,' photon packages.'
+      write(stdo,*) '         That is one such event every ',nphot/(1.d0*amrray_nr_out_cell_events),' photon packages.'
       if(amrray_nr_out_cell_events.lt.mc_nr_out_cell_events_maxrel*nphot) then
          write(stdo,*) '         These are rare events that can occur when using spherical coordinates.'
          write(stdo,*) '         As long as this number is tiny compared to the number of photon packages,'
