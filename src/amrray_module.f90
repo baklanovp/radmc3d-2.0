@@ -109,6 +109,7 @@ logical, allocatable :: amrray_spheres_outsidegrid(:)
 integer, allocatable :: amrray_spheres_sphidx(:)
 logical :: amrray_spheres_flag
 
+integer :: amrray_nr_out_cell_events=0
 
 !$OMP THREADPRIVATE(amrray_icross)
 !$OMP THREADPRIVATE(amrray_cell,amrray_nextcell)
@@ -1053,6 +1054,216 @@ do isph=1,amrray_spheres_nr-1
 enddo
 !
 end subroutine amrray_install_spheres
+
+
+!--------------------------------------------------------------------------
+!                Compute cross product of two vectors
+!--------------------------------------------------------------------------
+subroutine amrray_compute_cross_product(ax,ay,az,bx,by,bz,outx,outy,outz)
+implicit none
+doubleprecision :: ax,ay,az,bx,by,bz,outx,outy,outz
+outx = ay*bz-az*by
+outy = az*bx-ax*bz
+outz = ax*by-ay*bx
+end subroutine amrray_compute_cross_product
+
+
+!--------------------------------------------------------------------------
+!                         Compute r0, theta0, phi0
+!--------------------------------------------------------------------------
+subroutine amrray_compute_r0_theta0_phi0(x,y,z,r0,theta0,phi0)
+  implicit none
+  double precision :: x,y,z,r0,theta0,phi0,r02
+  r02    = x*x + y*y + z*z
+  r0     = sqrt(r02)
+  theta0 = acos(z/(r0+1d-199))
+  if(x.eq.0.d0) then
+     if(y.ge.0.d0) then
+        phi0   = pihalf
+     else
+        phi0   = 3.d0*pihalf
+     endif
+  else
+     phi0   = atan(y/x)
+     if(x.gt.0.d0) then
+        if(y.lt.0.d0) then
+           phi0   = phi0 + twopi
+        endif
+     else
+        phi0   = phi0 + pi
+     endif
+  endif
+  !################################
+  if((phi0.lt.0.d0).or.(phi0.gt.twopi)) stop 1309
+  !################################
+end subroutine amrray_compute_r0_theta0_phi0
+
+
+!--------------------------------------------------------------------------
+!            Check if photon out of spherical coordinates cell
+!               and if so, move it back to the cell surface
+!
+! This is just a correction subroutine for rare cases where a photon
+! finds itself (due to round-off errors) outside of the current cell.
+!--------------------------------------------------------------------------
+subroutine amrray_spher_keep_inside_cell(x,y,z,axi,r0,theta0,phi0)
+  implicit none
+  double precision :: x,y,z,axi(1:2,1:3)
+  double precision :: r0,theta0,phi0
+  double precision :: r0new,theta0new,phi0new
+  double precision :: correps,corrfac
+  double precision :: dx,dy,dz,qx,qy,qz,rc,xn,yn
+  logical :: corrected
+  !
+  ! Check everything and if necessary correct
+  !
+  corrected = .false.
+  if(r0>axi(2,1)*oneplust) then
+     ! Beyond outer radius of cell
+     correps = (r0-axi(2,1))/(axi(2,1)-axi(1,1))
+     if(abs(correps)>1d-4) then
+        write(stdo,*) 'ERROR: Photon way outside of cell (rmax). Aborting.'
+        stop 1131
+     endif
+     write(stdo,*) '         Photon outside of rmax. Correcting.'
+     corrfac = (axi(2,1)/r0)
+     if(abs(1d0-corrfac).gt.1d-3) stop 1133
+     x  = x * corrfac
+     y  = y * corrfac
+     z  = z * corrfac
+     r0 = axi(2,1)
+     corrected = .true.
+  endif
+  if(r0<axi(1,1)*oneminust) then
+     ! Inside of inner radius of cell
+     correps = (r0-axi(1,1))/(axi(2,1)-axi(1,1))
+     if(abs(correps)>1d-4) then
+        write(stdo,*) 'ERROR: Photon way outside of cell (rmin). Aborting.'
+        stop 1131
+     endif
+     write(stdo,*) '         Photon outside of rmin. Correcting.'
+     corrfac = (axi(1,1)/r0)
+     if(abs(1d0-corrfac).gt.1d-3) stop 1133
+     x  = x * corrfac
+     y  = y * corrfac
+     z  = z * corrfac
+     r0 = axi(1,1)
+     corrected = .true.
+  endif
+  if(theta0>axi(2,2)+tol) then
+     ! Beyond maximal theta of cell
+     correps = (theta0-axi(2,2))/(axi(2,2)-axi(1,2))
+     if(abs(correps)>1e-4) then
+        write(stdo,*) 'ERROR: Photon way outside of cell (thetamax). Aborting.'
+        stop 1131
+     endif
+     write(stdo,*) '         Photon outside of thetamax. Correcting.'
+     rc = sqrt(x**2+y**2)
+     if(rc.eq.0.d0) stop 9201
+     xn = x/rc
+     yn = y/rc
+     call amrray_compute_cross_product(xn,yn,0.d0,0.d0,0.d0,1.d0,qx,qy,qz)
+     call amrray_compute_cross_product(x,y,z,qx,qy,qz,dx,dy,dz)
+     dx = -dx*correps*(axi(2,2)-axi(1,2))
+     dy = -dy*correps*(axi(2,2)-axi(1,2))
+     dz = -dz*correps*(axi(2,2)-axi(1,2))
+     x  = x + dx
+     y  = y + dy
+     z  = z + dz
+     theta0 = axi(2,2)
+     corrected = .true.
+  endif
+  if(theta0<axi(1,2)-tol) then
+     ! Below minimal theta of cell
+     correps = (theta0-axi(1,2))/(axi(2,2)-axi(1,2))
+     if(abs(correps)>1e-4) then
+        write(stdo,*) 'ERROR: Photon way outside of cell (thetamin). Aborting.'
+        stop 1131
+     endif
+     write(stdo,*) '         Photon outside of thetamin. Correcting.'
+     rc = sqrt(x**2+y**2)
+     if(rc.eq.0.d0) stop 9201
+     xn = x/rc
+     yn = y/rc
+     call amrray_compute_cross_product(xn,yn,0.d0,0.d0,0.d0,1.d0,qx,qy,qz)
+     call amrray_compute_cross_product(x,y,z,qx,qy,qz,dx,dy,dz)
+     dx = -dx*correps*(axi(2,2)-axi(1,2))
+     dy = -dy*correps*(axi(2,2)-axi(1,2))
+     dz = -dz*correps*(axi(2,2)-axi(1,2))
+     x  = x + dx
+     y  = y + dy
+     z  = z + dz
+     theta0 = axi(1,2)
+     corrected = .true.
+  endif
+  if(phi0>axi(2,3)+tol) then
+     ! Beyond maximal phi of cell
+     correps = (phi0-axi(2,3))/(axi(2,3)-axi(1,3))
+     if(abs(correps)>1e-4) then
+        write(stdo,*) 'ERROR: Photon way outside of cell (phimax). Aborting.'
+        stop 1131
+     endif
+     write(stdo,*) '         Photon outside of phimax. Correcting.'
+     rc = sqrt(x**2+y**2)
+     if(rc.eq.0.d0) stop 9201
+     xn = x/rc
+     yn = y/rc
+     call amrray_compute_cross_product(0.d0,0.d0,1.d0,xn,yn,0.d0,dx,dy,dz)
+     dx = -dx*correps*(axi(2,3)-axi(1,3))
+     dy = -dy*correps*(axi(2,3)-axi(1,3))
+     dz = -dz*correps*(axi(2,3)-axi(1,3))
+     x  = x + dx
+     y  = y + dy
+     z  = z + dz
+     theta0 = axi(2,3)
+     corrected = .true.
+  endif
+  if(phi0<axi(1,3)-tol) then
+     ! Below minimal phi of cell
+     correps = (phi0-axi(1,3))/(axi(2,3)-axi(1,3))
+     if(abs(correps)>1e-4) then
+        write(stdo,*) 'ERROR: Photon way outside of cell (phimin). Aborting.'
+        stop 1131
+     endif
+     write(stdo,*) '         Photon outside of phimin. Correcting.'
+     rc = sqrt(x**2+y**2)
+     if(rc.eq.0.d0) stop 9201
+     xn = x/rc
+     yn = y/rc
+     call amrray_compute_cross_product(0.d0,0.d0,1.d0,xn,yn,0.d0,dx,dy,dz)
+     dx = -dx*correps*(axi(2,3)-axi(1,3))
+     dy = -dy*correps*(axi(2,3)-axi(1,3))
+     dz = -dz*correps*(axi(2,3)-axi(1,3))
+     x  = x + dx
+     y  = y + dy
+     z  = z + dz
+     theta0 = axi(1,3)
+     corrected = .true.
+  endif
+  !
+  ! If a correction took place:
+  !
+  if(corrected) then
+     !
+     ! Now check if everything is ok
+     !
+     call amrray_compute_r0_theta0_phi0(x,y,z,r0new,theta0new,phi0new)
+     if((r0new>axi(2,1)*oneplust).or.               &
+          (r0new<axi(1,1)*oneminust).or.            &
+          (theta0new>axi(2,2)+tol).or.              &
+          (theta0new<axi(1,2)-tol).or.              &
+          (phi0new>axi(2,3)+tol).or.                &
+          (phi0new<axi(1,3)-tol)) then
+        write(stdo,*) 'ERROR: Correction for outside-of-cell error has failed!'
+        write(stdo,*) 'ABORTING'
+        stop 3692
+     endif
+     !
+     ! Add to counter
+     !
+     amrray_nr_out_cell_events = amrray_nr_out_cell_events + 1
+  endif
+end subroutine amrray_spher_keep_inside_cell
 
 
 !--------------------------------------------------------------------------
@@ -4624,7 +4835,8 @@ else
    ! with cell edges.
    !========================================================================
    !
-   ! Self-check
+   ! Self-check if current location is a tiny bit outside of the cell
+   ! If so, correct for this. If it is waay out of the cell, abort.
    !
    if(amrray_selfcheck) then
       if((r0>axi(2,1)*oneplust).or.               &
@@ -4633,13 +4845,8 @@ else
          (theta0<axi(1,2)-tol).or.              &
          (phi0>axi(2,3)+tol).or.                &
          (phi0<axi(1,3)-tol)) then
-         write(stdo,*) 'ERROR: Photon outside of cell'
-         write(stdo,*) ray_cart_x,ray_cart_y,ray_cart_z
-         write(stdo,*) ray_cart_dirx,ray_cart_diry,ray_cart_dirz
-         write(stdo,*) r0,theta0,phi0
-         if(amr_tree_present) write(stdo,*) associated(amrray_cell),amrray_cell%id
-         write(stdo,*) axi
-         stop 1131
+         write(stdo,*) 'Warning: Photon outside of cell. Trying to correct...'
+         call amrray_spher_keep_inside_cell(ray_cart_x,ray_cart_y,ray_cart_z,axi,r0,theta0,phi0)
       endif
    endif
    !
@@ -5534,44 +5741,8 @@ else
               (theta0<bxi(1,2)-tol).or.              &
               (phi0>bxi(2,3)+tol).or.                &
               (phi0<bxi(1,3)-tol)) then
-            write(stdo,*) 'ERROR: Photon outside of NEXT cell'
-            write(stdo,*) ray_cart_x,ray_cart_y,ray_cart_z
-            write(stdo,*) ray_cart_dirx,ray_cart_diry,ray_cart_dirz,  &
-                 sqrt(ray_cart_dirx**2+ray_cart_diry**2+ray_cart_dirz**2)
-            write(stdo,*) r0,theta0,phi0
-            if(amr_tree_present) write(stdo,*) associated(amrray_nextcell),amrray_nextcell%id,crossequator
-            write(stdo,*) bxi
-            write(stdo,*) 'amrray_icross = ',amrray_icross,', cross_ds = ',cross_ds,', idir = ',idir
-            if(amr_tree_present) then
-               if(.not.associated(amrray_cell)) then 
-                  write(stdo,*) 'Started outside of cell'
-               else
-                  write(stdo,*) 'Started inside of cell'
-                  write(stdo,*) axi
-               endif
-            else
-               if(amrray_ix_curr.le.0) then 
-                  write(stdo,*) 'Started outside of cell'
-               else
-                  write(stdo,*) 'Started inside of cell'
-                  write(stdo,*) axi
-               endif
-            endif
-            write(stdo,*) 'sin2 cos2 = ',st2,ct2
-            if(amr_tree_present) then
-               st2   = amrray_finegrid_sintsq1(amrray_cell%ixyzf(2),amrray_cell%level)
-               ct2   = amrray_finegrid_costsq1(amrray_cell%ixyzf(2),amrray_cell%level)
-            else
-               st2   = amrray_finegrid_sintsq1(amrray_iy_curr,0)
-               ct2   = amrray_finegrid_costsq1(amrray_iy_curr,0)
-            endif
-            pa    = ct2*(ray_cart_dirx**2+ray_cart_diry**2)-st2*ray_cart_dirz**2
-            pb    = 2.d0*ct2*(ray_cart_dirx*ray_cart_x + ray_cart_diry*ray_cart_y) - &
-                 2.d0*st2*ray_cart_dirz*ray_cart_z
-            pc    = ct2*(ray_cart_x**2+ray_cart_y**2)-st2*ray_cart_z**2
-            write(stdo,*) pa,pb/r0,pc/r0**2
-            write(stdo,*) 4*pa*pc/pb**2
-            stop 1132
+            write(stdo,*) 'Warning: Photon outside of NEXT cell. Trying to correct...'
+            call amrray_spher_keep_inside_cell(ray_cart_x,ray_cart_y,ray_cart_z,bxi,r0,theta0,phi0)
          endif
       endif
    endif

@@ -233,6 +233,10 @@ double precision :: mcscat_localobs_pos(1:3)
 !
 double precision, allocatable :: mc_stellarsrc_templates(:,:)
 !
+! Tolerance for out-of-cell events
+!
+doubleprecision :: mc_nr_out_cell_events_maxrel=1d-5
+!
 ! Global flag for Monte Carlo
 !
 logical :: mc_photon_destroyed
@@ -396,6 +400,10 @@ subroutine montecarlo_init(params,ierr,mcaction,resetseed)
         mcscat_nrdirs = 1
      endif
   endif
+  !
+  ! Reset the counter of number of out-of-cell-events
+  !
+  amrray_nr_out_cell_events = 0
   !
   ! Do some tests
   !
@@ -2758,6 +2766,21 @@ subroutine do_monte_carlo_bjorkmanwood(params,ierror,resetseed)
    ! Free the emission database
    !
    call free_emiss_dbase()
+   !
+   ! Check the number of out-of-cell events
+   !
+   if(amrray_nr_out_cell_events.gt.0) then
+      write(stdo,*) 'Warning: There were ',amrray_nr_out_cell_events,' out-of-cell events.'
+      write(stdo,*) '         That is one such event every ',nphot/amrray_nr_out_cell_events,' photon packages.'
+      if(amrray_nr_out_cell_events.lt.mc_nr_out_cell_events_maxrel*nphot) then
+         write(stdo,*) '         These are rare events that can occur when using spherical coordinates.'
+         write(stdo,*) '         As long as this number is tiny compared to the number of photon packages,'
+         write(stdo,*) '         as is the case here, they are harmless.'
+      else
+         write(stdo,*) '         These should be rare events that can occur when using spherical coordinates.'
+         write(stdo,*) '         In this case the number is larger than expected. Please warn the author.'
+      endif
+   endif
    !
    ! Done...
    !
