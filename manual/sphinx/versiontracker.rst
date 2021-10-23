@@ -409,4 +409,7 @@ This version overview is very rough, and has only been started as of version
     (ascii) format or binary format. 
   * The manual is now converted to Sphinx, from which the LaTeX version
     and the HTML version can be automatically created.
-
+  * The out-of-cell error message that stopped the code is now replaced
+    by a mere warning and a correction, and the code continues. So now
+    for very long runs (large number of photon packages) it is no longer
+    crashing.
