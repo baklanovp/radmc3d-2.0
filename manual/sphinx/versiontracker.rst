@@ -413,3 +413,11 @@ This version overview is very rough, and has only been started as of version
     by a mere warning and a correction, and the code continues. So now
     for very long runs (large number of photon packages) it is no longer
     crashing.
+  * [as of 11.11.2021] BUGFIX: For OpenMP parallel thermal Monte Carlo
+    computation of the dust temperatures for multiple grain species or
+    sizes, when ``iranfreqmode=1`` (as opposed to the default value of
+    ``iranfreqmode=0``), the dust temperatures could acquire errors
+    because the ``pick_randomfreq_db()`` subroutine uses the array
+    ``db_cumul(:)`` as thread private, but without having it declared
+    as such. This led to interference between threads. This is now
+    fixed.
