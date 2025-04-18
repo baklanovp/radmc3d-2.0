@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
+
 import numpy as np
-from natconst import *
+from .natconst import *
 from numpy.random import default_rng
 import matplotlib.pyplot as plt
 from scipy.signal import fftconvolve
@@ -298,58 +300,64 @@ class sph_to_sphergrid(object):
     def compute_density(self):
         self.rho = self.cellmass / self.grid_vol
 
-# #
-# # UNCOMMENT THE FOLLOWING FOR AN EXAMPLE OF USAGE
-# #
-# #
-# # Creat the random number generator for creating the dummy SPH model
-# #
-# rng     = default_rng()
-# 
-# #
-# # Parameters of the dummy model
-# #
-# mdisk      = 1e-5*MS
-# hpr        = 0.05
-# hrkernel   = 0.03*np.array([2,1,20])
-# 
-# #
-# # Dummy model for the SPH particles
-# #
-# nsph       = 1000000
-# sph_r      = au*10**(2*rng.uniform(size=nsph))
-# sph_th     = np.pi/2 - hpr*rng.standard_normal(size=nsph)
-# sph_phi    = 2*np.pi*rng.uniform(size=nsph)
-# sph_lr     = np.log(sph_r)
-# rthphi     = np.vstack((sph_r,sph_th,sph_phi)).T
-# masses     = mdisk/nsph
-# 
-# #
-# # Set up the grid
-# #
-# grid_nr    = 200
-# grid_nth   = 100
-# grid_nph   = 100
-# grid_rin   = 0.9*au
-# grid_rout  = 110*au
-# grid_hrup  = 0.25
-# 
-# #
-# # Make the object to convert to spherical grid
-# #
-# sphgrid    = sph_to_sphergrid(rthph=rthphi,masses=masses,rin=grid_rin,rout=grid_rout,nr=grid_nr,
-#                               ntheta=grid_nth,nphi=grid_nph,hrup=grid_hrup,hrkernel=hrkernel)
-# 
-# #
-# # Show
-# #
-# print('Plotting the two grids')
-# plt.figure()
-# plt.imshow(sphgrid.cellmass_unconvolved.sum(axis=2).T,origin='lower')
-# plt.figure()
-# plt.imshow(sphgrid.cellmass.sum(axis=2).T,origin='lower')
-# plt.figure()
-# plt.imshow((sphgrid.rho.mean(axis=2)*sphgrid.grid_rc[:,None]**3).T,origin='lower')
-# plt.figure()
-# plt.plot(sphgrid.rho[100,50,:])
-# plt.show()
+#
+# UNCOMMENT THE FOLLOWING FOR AN EXAMPLE OF USAGE
+#
+#
+# Creat the random number generator for creating the dummy SPH model
+#
+
+# def main():
+#     rng     = default_rng()
+
+#     #
+#     # Parameters of the dummy model
+#     #
+#     mdisk      = 1e-5*MS
+#     hpr        = 0.05
+#     hrkernel   = 0.03*np.array([2,1,20])
+
+#     #
+#     # Dummy model for the SPH particles
+#     #
+#     nsph       = 1000000
+#     sph_r      = au*10**(2*rng.uniform(size=nsph))
+#     sph_th     = np.pi/2 - hpr*rng.standard_normal(size=nsph)
+#     sph_phi    = 2*np.pi*rng.uniform(size=nsph)
+#     sph_lr     = np.log(sph_r)
+#     rthphi     = np.vstack((sph_r,sph_th,sph_phi)).T
+#     masses     = mdisk/nsph
+
+#     #
+#     # Set up the grid
+#     #
+#     grid_nr    = 200
+#     grid_nth   = 100
+#     grid_nph   = 100
+#     grid_rin   = 0.9*au
+#     grid_rout  = 110*au
+#     grid_hrup  = 0.25
+
+#     #
+#     # Make the object to convert to spherical grid
+#     #
+#     sphgrid    = sph_to_sphergrid(rthphi=rthphi,masses=masses,rin=grid_rin,rout=grid_rout,nr=grid_nr,
+#                                 ntheta=grid_nth,nphi=grid_nph,hrup=grid_hrup,hrkernel=hrkernel)
+
+#     #
+#     # Show
+#     #
+#     print('Plotting the two grids')
+#     plt.figure()
+#     plt.imshow(sphgrid.cellmass_unconvolved.sum(axis=2).T,origin='lower')
+#     plt.figure()
+#     plt.imshow(sphgrid.cellmass.sum(axis=2).T,origin='lower')
+#     plt.figure()
+#     plt.imshow((sphgrid.rho.mean(axis=2)*sphgrid.grid_rc[:,None]**3).T,origin='lower')
+#     plt.figure()
+#     plt.plot(sphgrid.rho[100,50,:])
+#     plt.show()
+
+
+# if __name__ == '__main__':
+#     main()

@@ -322,7 +322,7 @@ program radmc3d
   !
   ! Write a banner:
   !
-  call write_banner()
+!   call write_banner()
   !
   ! Now check consistency of some of the input files.
   !

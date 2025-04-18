@@ -4186,8 +4186,8 @@ end subroutine do_lambda_starlight_single_scattering_simple
 !--------------------------------------------------------------------------
 subroutine walk_full_path_bjorkmanwood(params,ierror)
   implicit none
-  type(mc_params) :: params
-  integer :: ierror
+  type(mc_params), intent(in) :: params
+  integer, intent(out) :: ierror
   !
   double precision :: taupath,sint,epsdist
   double precision :: dir(1:3),enold,albedo,dum,g,rn
@@ -8250,7 +8250,8 @@ end subroutine do_absorption_event
 !--------------------------------------------------------------------------
 subroutine montecarlo_randomdir(dirx,diry,dirz)
   implicit none
-  doubleprecision :: dirx,diry,dirz,linv,l2
+  doubleprecision, intent(out) :: dirx,diry,dirz
+  doubleprecision :: linv,l2
   !
   ! Do a loop: only accept directions that are within unit circle
   !
